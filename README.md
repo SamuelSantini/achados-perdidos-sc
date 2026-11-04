@@ -12,20 +12,21 @@ Sistema web para a escola: quem encontra um objeto cadastra no site, e quem perd
 | Frontend | HTML, CSS e JavaScript | As telas do site, os formulários e a busca |
 | Backend | Node.js + Express | Recebe as requisições, aplica as regras e fala com o banco |
 | API | REST com JSON | Comunicação entre o frontend e o backend |
-| Banco de dados | Supabase (Postgres) | Guarda os objetos na tabela `objetos` do projeto `achados-perdidos` |
+| Banco de dados | Supabase (Postgres) | Projeto `uzvoxpooxbwbokxtfcpi` — tabelas `objetos` e `usuarios` |
 
 ## Como rodar
 
 1. Instale o **Node.js** (versão 22.13 ou mais nova; a versão LTS do site nodejs.org serve).
-2. Crie um arquivo `.env` nesta pasta (veja `.env.example`) com a URL e a chave publicável do projeto Supabase `achados-perdidos`, e um segredo de sessão:
+2. Crie um arquivo `.env` nesta pasta (veja `.env.example`) apontando para o projeto Supabase **`uzvoxpooxbwbokxtfcpi`**, e um segredo de sessão:
 
    ```
-   SUPABASE_URL=https://SEU-PROJETO.supabase.co
+   SUPABASE_URL=https://uzvoxpooxbwbokxtfcpi.supabase.co
    SUPABASE_PUBLISHABLE_KEY=sua-chave-publicavel
    SESSION_SECRET=troque-por-um-segredo-longo
    ```
 
-3. No SQL Editor do Supabase, rode o script `sql/usuarios-auth.sql` (cria a coluna `papel` na tabela `usuarios`).
+   A chave publishable/anon sai de **Project Settings → API Keys** no [dashboard](https://supabase.com/dashboard/project/uzvoxpooxbwbokxtfcpi/settings/api). Não commite a chave real.
+3. No [SQL Editor](https://supabase.com/dashboard/project/uzvoxpooxbwbokxtfcpi/sql) desse projeto, rode `sql/schema.sql` (cria `objetos`, `usuarios`, coluna `papel` e políticas RLS básicas). Em banco que já tinha `usuarios`, basta `sql/usuarios-auth.sql`.
 4. Abra o terminal nesta pasta e rode:
 
    ```
@@ -34,8 +35,6 @@ Sistema web para a escola: quem encontra um objeto cadastra no site, e quem perd
    ```
 
 5. Abra **http://localhost:3000** no navegador.
-
-O projeto Supabase já começa com 8 objetos de exemplo.
 
 ### Criar o primeiro admin (secretaria)
 
@@ -57,7 +56,8 @@ achados-e-perdidos/
 ├── db.js                → banco: objetos + usuarios no Supabase
 ├── auth.js              → hash de senha e tokens de sessão
 ├── package.json         → dependências e scripts
-├── sql/usuarios-auth.sql→ migração: coluna papel
+├── sql/schema.sql       → schema completo (objetos + usuarios + auth)
+├── sql/usuarios-auth.sql→ migração incremental: coluna papel
 ├── scripts/criar-admin.js → seed do primeiro admin
 └── public/              → frontend
     ├── index.html       → as 4 telas + modal de login
@@ -131,9 +131,9 @@ O site e a API sobem juntos no **Render**, ligados ao repositório do GitHub. O 
 
 1. Entre em [dashboard.render.com](https://dashboard.render.com) e escolha **New → Blueprint**.
 2. Conecte a conta do GitHub e selecione o repositório `achados-perdidos`.
-3. O Render lê o arquivo `render.yaml`. Quando pedir, cole os valores de `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SESSION_SECRET` que estão no `.env` deste computador.
+3. O Render lê o arquivo `render.yaml`. Quando pedir, use `SUPABASE_URL=https://uzvoxpooxbwbokxtfcpi.supabase.co`, a chave publishable do dashboard e o `SESSION_SECRET` do `.env` local.
 4. Confirme a criação. O endereço público fica no formato `https://achados-perdidos.onrender.com`.
 
-Build: `npm install`. Start: `npm start`. A região é a Virgínia, a mesma do projeto Supabase.
+Build: `npm install`. Start: `npm start`. A região é a Virgínia.
 
 No plano grátis o serviço dorme sem visitas. A primeira abertura depois disso pode levar cerca de um minuto. Os objetos não se perdem, porque ficam no Supabase.

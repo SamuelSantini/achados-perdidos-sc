@@ -1,3 +1,6 @@
+# Supabase project_ref: uzvoxpooxbwbokxtfcpi
+# SUPABASE_URL esperada: https://uzvoxpooxbwbokxtfcpi.supabase.co
+# SUPABASE_PUBLISHABLE_KEY: cole a chave publishable/anon do dashboard (não versionar).
 services:
   - type: web
     name: achados-perdidos
