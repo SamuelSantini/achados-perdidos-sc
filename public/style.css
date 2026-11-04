@@ -101,6 +101,45 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .nav a:hover { color: var(--on-board); background: rgba(255,255,255,.08); }
 .nav a[aria-current="page"] { background: var(--board-accent); color: #2a1424; }
 
+.auth-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.auth-bar .btn.soft {
+  background: rgba(255,255,255,.12);
+  color: var(--on-board);
+  border-color: transparent;
+}
+.auth-bar .btn.soft:hover { background: rgba(255,255,255,.2); }
+.auth-bar .btn.ghost {
+  color: var(--on-board);
+  border-color: rgba(255,255,255,.25);
+  background: transparent;
+}
+.auth-user {
+  font-weight: 700;
+  font-size: .9rem;
+  color: var(--board-accent);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth-modal { max-width: 420px; width: min(420px, 100%); }
+.auth-body { padding: 28px 24px 24px; }
+.auth-body h2 { margin-bottom: 6px; }
+.auth-sub { color: var(--muted); margin-bottom: 18px; font-size: .95rem; }
+.auth-actions { margin-top: 8px; }
+.acesso-sessao {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--pink) 35%, transparent);
+}
+
 .wrap {
   max-width: 1140px;
   margin: 0 auto;
@@ -372,11 +411,13 @@ textarea.input { resize: vertical; min-height: 96px; }
   display: grid; place-items: center;
   padding: 20px;
 }
+#authOverlay { z-index: 55; }
 .modal {
   background: var(--surface); border-radius: var(--r-lg);
   width: min(100%, 640px); max-height: calc(100% - 40px); overflow: auto;
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
 }
+.modal.auth-modal { grid-template-columns: 1fr; }
 .modal .pic { aspect-ratio: auto; min-height: 240px; height: 100%; }
 .modal-body { padding: 24px; display: grid; gap: 12px; align-content: start; position: relative; min-width: 0; }
 .modal-body h2 { font-size: 1.6rem; font-weight: 800; padding-right: 36px; }

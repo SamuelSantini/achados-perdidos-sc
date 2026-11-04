@@ -7,8 +7,11 @@
 //   disponivel → sem dono
 //   aguardando → um dono reservou a retirada
 //   devolvido  → a secretaria confirmou a entrega e o registro trava
+//
+// Usuários (tabela usuarios): login, senha (bcrypt), papel (admin|usuario).
 // ===================================================================
 const { createClient } = require('@supabase/supabase-js');
+const auth = require('./auth');
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -36,6 +39,126 @@ function normalizar(row) {
   };
 }
 
+function normalizarUsuario(row) {
+  if (!row) return null;
+  const papel = row.papel === 'admin' ? 'admin' : 'usuario';
+  return { login: row.login, papel, senha: row.senha };
+}
+
+async function buscarUsuario(login) {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('login, senha, papel')
+    .eq('login', login)
+    .maybeSingle();
+  if (error) {
+    // Coluna papel ainda não existe: tenta só login/senha
+    if (error.code === '42703' || /papel/i.test(error.message || '')) {
+      const legado = await supabase
+        .from('usuarios')
+        .select('login, senha')
+        .eq('login', login)
+        .maybeSingle();
+      if (legado.error) falha(legado.error);
+      if (!legado.data) return null;
+      return { login: legado.data.login, senha: legado.data.senha, papel: 'usuario' };
+    }
+    falha(error);
+  }
+  return normalizarUsuario(data);
+}
+
+async function atualizarSenhaHash(login, hash) {
+  const { error } = await supabase.from('usuarios').update({ senha: hash }).eq('login', login);
+  if (error) falha(error);
+}
+
+async function registrarUsuario(login, senha) {
+  const existente = await buscarUsuario(login);
+  if (existente) return { erro: 'Este login já está em uso. Escolha outro ou entre com a senha.' };
+
+  const hash = await auth.hashSenha(senha);
+  const inserir = await supabase
+    .from('usuarios')
+    .insert({ login, senha: hash, papel: 'usuario' })
+    .select('login, papel')
+    .maybeSingle();
+
+  if (inserir.error) {
+    if (inserir.error.code === '42703' || /papel/i.test(inserir.error.message || '')) {
+      const legado = await supabase
+        .from('usuarios')
+        .insert({ login, senha: hash })
+        .select('login')
+        .maybeSingle();
+      if (legado.error) {
+        if (legado.error.code === '23505') return { erro: 'Este login já está em uso. Escolha outro ou entre com a senha.' };
+        falha(legado.error);
+      }
+      return { login: legado.data.login, papel: 'usuario' };
+    }
+    if (inserir.error.code === '23505') return { erro: 'Este login já está em uso. Escolha outro ou entre com a senha.' };
+    falha(inserir.error);
+  }
+  return { login: inserir.data.login, papel: inserir.data.papel === 'admin' ? 'admin' : 'usuario' };
+}
+
+async function autenticar(login, senha) {
+  const usuario = await buscarUsuario(login);
+  if (!usuario) return { erro: 'Login ou senha incorretos.' };
+  const ok = await auth.senhaConfere(senha, usuario.senha);
+  if (!ok) return { erro: 'Login ou senha incorretos.' };
+
+  // Migra senha em texto claro para bcrypt no próximo login bem-sucedido
+  if (!auth.pareceHash(usuario.senha)) {
+    try {
+      await atualizarSenhaHash(login, await auth.hashSenha(senha));
+    } catch (e) {
+      console.error('Não foi possível re-hashear a senha de', login, e);
+    }
+  }
+
+  return { login: usuario.login, papel: usuario.papel };
+}
+
+async function definirAdmin(login, senha) {
+  const hash = await auth.hashSenha(senha);
+  const existente = await buscarUsuario(login);
+
+  if (existente) {
+    const comPapel = await supabase
+      .from('usuarios')
+      .update({ senha: hash, papel: 'admin' })
+      .eq('login', login)
+      .select('login, papel')
+      .maybeSingle();
+    if (comPapel.error) {
+      if (comPapel.error.code === '42703' || /papel/i.test(comPapel.error.message || '')) {
+        throw new Error(
+          'A coluna "papel" ainda não existe. Rode sql/usuarios-auth.sql no SQL Editor do Supabase e tente de novo.'
+        );
+      }
+      falha(comPapel.error);
+    }
+    return { login: comPapel.data.login, papel: 'admin' };
+  }
+
+  const criado = await supabase
+    .from('usuarios')
+    .insert({ login, senha: hash, papel: 'admin' })
+    .select('login, papel')
+    .maybeSingle();
+  if (criado.error) {
+    if (criado.error.code === '42703' || /papel/i.test(criado.error.message || '')) {
+      throw new Error(
+        'A coluna "papel" ainda não existe. Rode sql/usuarios-auth.sql no SQL Editor do Supabase e tente de novo.'
+      );
+    }
+    falha(criado.error);
+  }
+  return { login: criado.data.login, papel: 'admin' };
+}
+
 async function listarObjetos() {
   const { data, error } = await supabase
     .from('objetos')
@@ -54,24 +177,6 @@ async function buscarObjeto(id) {
     .maybeSingle();
   if (error) falha(error);
   return normalizar(data);
-}
-
-async function entrar(login, senha) {
-  const busca = await supabase.from('usuarios').select('senha').eq('login', login).maybeSingle();
-  if (busca.error) falha(busca.error);
-  if (busca.data) {
-    if (busca.data.senha !== senha) return { erro: 'Senha incorreta para este login.' };
-    return { ok: true };
-  }
-
-  const criado = await supabase.from('usuarios').insert({ login, senha }).select('login').maybeSingle();
-  if (!criado.error) return { ok: true };
-  if (criado.error.code !== '23505') falha(criado.error);
-
-  const deNovo = await supabase.from('usuarios').select('senha').eq('login', login).maybeSingle();
-  if (deNovo.error) falha(deNovo.error);
-  if (deNovo.data && deNovo.data.senha === senha) return { ok: true };
-  return { erro: 'Senha incorreta para este login.' };
 }
 
 async function criarObjeto(objeto) {
@@ -168,7 +273,10 @@ async function excluirObjeto(id) {
 module.exports = {
   listarObjetos,
   buscarObjeto,
-  entrar,
+  buscarUsuario,
+  registrarUsuario,
+  autenticar,
+  definirAdmin,
   criarObjeto,
   atualizarObjeto,
   reivindicarObjeto,

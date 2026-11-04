@@ -14,3 +14,5 @@ services:
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
+      - key: SESSION_SECRET
+        sync: false

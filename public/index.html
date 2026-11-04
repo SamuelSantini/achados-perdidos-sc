@@ -41,8 +41,11 @@
       <a href="#inicio" data-reset>Início</a>
       <a href="#achados" data-reset>Objetos encontrados</a>
       <a href="#cadastrar" data-reset>Cadastrar</a>
-      <a href="#gerenciar" data-reset>Secretaria</a>
+      <a href="#gerenciar" data-reset id="navSecretaria" hidden>Secretaria</a>
     </nav>
+    <div class="auth-bar" id="authBar">
+      <button type="button" class="btn soft small" id="btnEntrar">Entrar</button>
+    </div>
   </div>
 </header>
 
@@ -131,20 +134,9 @@
     </div>
     <div class="form-layout">
       <form class="panel form" id="objForm" novalidate>
-        <div id="acesso">
-          <div class="row2">
-            <div class="field">
-              <label for="iLogin">Login <span class="req">*</span></label>
-              <input class="input" id="iLogin" maxlength="40" autocomplete="username" placeholder="Ex.: maria.souza">
-              <span class="err" id="eLogin" hidden>Escreva um login com pelo menos 3 letras, sem espaço.</span>
-            </div>
-            <div class="field">
-              <label for="iSenha">Senha <span class="req">*</span></label>
-              <input class="input" id="iSenha" type="password" maxlength="40" autocomplete="current-password">
-              <span class="err" id="eSenha" hidden>A senha precisa ter pelo menos 4 letras.</span>
-            </div>
-          </div>
-          <p class="acesso-hint">Na primeira vez, o acesso fica salvo. Para cadastrar outro objeto, repita o mesmo login e a mesma senha.</p>
+        <div id="acesso" class="acesso-sessao" hidden>
+          <p class="acesso-hint" id="acessoHint">Entre com sua conta para cadastrar um objeto encontrado.</p>
+          <button type="button" class="btn soft small" id="btnEntrarCadastro">Entrar ou criar conta</button>
         </div>
         <div class="field">
           <label for="iNome">Nome do objeto <span class="req">*</span></label>
@@ -214,6 +206,32 @@
 
 <div class="overlay" id="overlay" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle" id="modal"></div>
+</div>
+<div class="overlay" id="authOverlay" hidden>
+  <div class="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle" id="authModal">
+    <div class="modal-body auth-body">
+      <button type="button" class="icon-btn close" id="authClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <h2 id="authTitle">Entrar</h2>
+      <p class="auth-sub" id="authSub">Use seu login para reivindicar um objeto ou cadastrar um achado.</p>
+      <form id="authForm" novalidate>
+        <div class="field">
+          <label for="aLogin">Login <span class="req">*</span></label>
+          <input class="input" id="aLogin" maxlength="40" autocomplete="username" placeholder="Ex.: maria.souza">
+          <span class="err" id="eALogin" hidden>Escreva um login com pelo menos 3 letras, sem espaço.</span>
+        </div>
+        <div class="field">
+          <label for="aSenha">Senha <span class="req">*</span></label>
+          <input class="input" id="aSenha" type="password" maxlength="40" autocomplete="current-password">
+          <span class="err" id="eASenha" hidden>A senha precisa ter pelo menos 4 letras.</span>
+        </div>
+        <p class="err" id="eAuth" hidden></p>
+        <div class="form-actions auth-actions">
+          <button type="submit" class="btn primary" id="authSubmit">Entrar</button>
+          <button type="button" class="btn ghost" id="authToggle">Criar conta</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </body>

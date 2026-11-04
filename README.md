@@ -17,56 +17,87 @@ Sistema web para a escola: quem encontra um objeto cadastra no site, e quem perd
 ## Como rodar
 
 1. Instale o **Node.js** (versão 22.13 ou mais nova; a versão LTS do site nodejs.org serve).
-2. Crie um arquivo `.env` nesta pasta com a URL e a chave publicável do projeto Supabase `achados-perdidos`:
+2. Crie um arquivo `.env` nesta pasta (veja `.env.example`) com a URL e a chave publicável do projeto Supabase `achados-perdidos`, e um segredo de sessão:
 
    ```
    SUPABASE_URL=https://SEU-PROJETO.supabase.co
    SUPABASE_PUBLISHABLE_KEY=sua-chave-publicavel
+   SESSION_SECRET=troque-por-um-segredo-longo
    ```
 
-3. Abra o terminal nesta pasta e rode:
+3. No SQL Editor do Supabase, rode o script `sql/usuarios-auth.sql` (cria a coluna `papel` na tabela `usuarios`).
+4. Abra o terminal nesta pasta e rode:
 
    ```
    npm install
    npm start
    ```
 
-4. Abra **http://localhost:3000** no navegador.
+5. Abra **http://localhost:3000** no navegador.
 
 O projeto Supabase já começa com 8 objetos de exemplo.
+
+### Criar o primeiro admin (secretaria)
+
+Com o `.env` configurado e a migração SQL aplicada:
+
+```
+npm run criar-admin -- secretaria senha-forte
+```
+
+Isso cria (ou atualiza) o login `secretaria` com papel `admin` e senha com hash bcrypt. Entre no site com esse login para ver o menu **Secretaria**.
+
+Contas criadas pelo botão “Criar conta” no site são sempre `usuario` (podem cadastrar achados e reivindicar; não gerenciam).
 
 ## Estrutura
 
 ```
 achados-e-perdidos/
-├── server.js        → backend: servidor Express e rotas da API
-├── db.js            → banco de dados: conversa com a tabela objetos no Supabase
-├── package.json     → dependências e o comando npm start
-└── public/          → frontend
-    ├── index.html   → as 4 telas
-    ├── style.css    → o visual
-    └── app.js       → lógica das telas e chamadas para a API
+├── server.js            → backend: servidor Express e rotas da API
+├── db.js                → banco: objetos + usuarios no Supabase
+├── auth.js              → hash de senha e tokens de sessão
+├── package.json         → dependências e scripts
+├── sql/usuarios-auth.sql→ migração: coluna papel
+├── scripts/criar-admin.js → seed do primeiro admin
+└── public/              → frontend
+    ├── index.html       → as 4 telas + modal de login
+    ├── style.css        → o visual
+    └── app.js           → lógica das telas e chamadas para a API
 ```
+
+## Autenticação e papéis
+
+| Papel | Pode |
+|---|---|
+| `usuario` | Entrar, cadastrar objeto encontrado, reivindicar (marcar como seu) |
+| `admin` | Tudo do usuário + editar, excluir, desfazer reserva, confirmar retirada (tela Secretaria) |
+
+- Login/registro: `POST /api/auth/login` e `POST /api/auth/registrar` → devolvem um token Bearer (válido ~7 dias).
+- O frontend guarda o token em `localStorage` e manda `Authorization: Bearer …`.
+- Senhas são salvas com **bcrypt**. Senhas antigas em texto claro são re-hasheadas no próximo login.
 
 ## Telas
 
 - **Início:** apresentação, botões principais e objetos encontrados recentemente
-- **Objetos encontrados:** lista com busca e filtros por categoria, local e status
-- **Cadastrar:** formulário com foto opcional e prévia do card. O objeto sempre entra disponível e sem dono
-- **Gerenciar:** corrigir, excluir, desfazer uma reserva ou confirmar a retirada, com o painel das requisições feitas à API
+- **Objetos encontrados:** lista com busca e filtros por categoria, local e status; reivindicar exige login
+- **Cadastrar:** formulário com foto opcional (usuário logado). O objeto sempre entra disponível e sem dono
+- **Secretaria:** só para admin — corrigir, excluir, desfazer reserva ou confirmar retirada
 
 ## API (CRUD)
 
-| Método | Endereço | Ação | Resposta |
+| Método | Endereço | Quem | Resposta |
 |---|---|---|---|
-| GET | `/api/objetos` | Listar todos (consulta) | 200 |
-| GET | `/api/objetos/:id` | Ver um objeto | 200 ou 404 |
-| POST | `/api/objetos` | Cadastrar (cadastro) | 201 ou 400 |
-| PUT | `/api/objetos/:id` | Corrigir os dados, sem mudar dono nem situação | 200, 400 ou 404 |
-| POST | `/api/objetos/:id/reivindicar` | O dono se identifica e marca a retirada | 200, 400, 404 ou 409 |
-| POST | `/api/objetos/:id/cancelar` | Desfaz a reserva | 200, 400, 404 ou 409 |
-| POST | `/api/objetos/:id/retirar` | A secretaria confirma a entrega | 200, 400, 404 ou 409 |
-| DELETE | `/api/objetos/:id` | Excluir (exclusão) | 204 ou 404 |
+| POST | `/api/auth/registrar` | público | 201 |
+| POST | `/api/auth/login` | público | 200 |
+| GET | `/api/auth/me` | logado | 200 |
+| GET | `/api/objetos` | público | 200 |
+| GET | `/api/objetos/:id` | público | 200 ou 404 |
+| POST | `/api/objetos` | logado | 201 ou 400 |
+| PUT | `/api/objetos/:id` | admin | 200, 400, 403 ou 404 |
+| POST | `/api/objetos/:id/reivindicar` | logado | 200, 400, 404 ou 409 |
+| POST | `/api/objetos/:id/cancelar` | admin | 200, 400, 403, 404 ou 409 |
+| POST | `/api/objetos/:id/retirar` | admin | 200, 400, 403, 404 ou 409 |
+| DELETE | `/api/objetos/:id` | admin | 204, 403 ou 404 |
 
 Regras: nome, local e data são obrigatórios; a data é real e não pode ser no futuro. Um objeto novo nasce `disponivel` e sem dono. Só um objeto disponível pode ser reservado, e a reserva exige nome e contato do dono. A retirada só é confirmada depois da reserva. Objeto devolvido não volta atrás e não é editado.
 
@@ -100,7 +131,7 @@ O site e a API sobem juntos no **Render**, ligados ao repositório do GitHub. O 
 
 1. Entre em [dashboard.render.com](https://dashboard.render.com) e escolha **New → Blueprint**.
 2. Conecte a conta do GitHub e selecione o repositório `achados-perdidos`.
-3. O Render lê o arquivo `render.yaml`. Quando pedir, cole os valores de `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` que estão no `.env` deste computador.
+3. O Render lê o arquivo `render.yaml`. Quando pedir, cole os valores de `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SESSION_SECRET` que estão no `.env` deste computador.
 4. Confirme a criação. O endereço público fica no formato `https://achados-perdidos.onrender.com`.
 
 Build: `npm install`. Start: `npm start`. A região é a Virgínia, a mesma do projeto Supabase.
