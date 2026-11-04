@@ -36,6 +36,10 @@ Sistema web para a escola: quem encontra um objeto cadastra no site, e quem perd
 
 5. Abra **http://localhost:3000** no navegador.
 
+### MCP Supabase (Cursor)
+
+O arquivo `.cursor/mcp.json` aponta o servidor MCP do projeto `uzvoxpooxbwbokxtfcpi` (sem secrets). No Cursor IDE, aprove/conecte o MCP e, se pedir login: `agent mcp login supabase`. Só a config no repo **não** autentica cloud workers.
+
 ### Criar o primeiro admin (secretaria)
 
 Com o `.env` configurado e a migração SQL aplicada:
