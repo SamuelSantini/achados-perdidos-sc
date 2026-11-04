@@ -6,6 +6,9 @@
 // Um objeto encontrado nasce disponível e sem dono.
 // Outra pessoa se identifica e marca a retirada.
 // A secretaria confirma a entrega, e aí o registro não muda mais.
+//
+// Papéis: admin gerencia (editar/excluir/cancelar/retirar);
+//         usuario autenticado pode cadastrar e reivindicar.
 // ===================================================================
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,6 +22,7 @@ if (fs.existsSync(arquivoEnv)) {
 
 const express = require('express');
 const db = require('./db');
+const auth = require('./auth');
 
 const app = express();
 const PORTA = process.env.PORT || 3000;
@@ -74,7 +78,7 @@ function validar(o) {
   return erros;
 }
 
-function validarAcesso(body) {
+function validarCredenciais(body) {
   const login = texto(body.login);
   const senha = texto(body.senha);
   const erros = [];
@@ -101,6 +105,81 @@ function buscarPorId(id) {
   return db.buscarObjeto(id);
 }
 
+function respostaSessao(usuario) {
+  const token = auth.emitirToken(usuario);
+  return { token, usuario: auth.usuarioPublico(usuario) };
+}
+
+async function anexarUsuario(req, res, next) {
+  const token = auth.tokenDoPedido(req);
+  if (!token) {
+    req.usuario = null;
+    return next();
+  }
+  const sessao = auth.lerToken(token);
+  if (!sessao) {
+    req.usuario = null;
+    return next();
+  }
+  try {
+    const u = await db.buscarUsuario(sessao.login);
+    req.usuario = u ? { login: u.login, papel: u.papel } : null;
+  } catch (err) {
+    return next(err);
+  }
+  next();
+}
+
+function exigirLogin(req, res, next) {
+  if (!req.usuario) {
+    return res.status(401).json({ erro: 'Faça login para continuar.' });
+  }
+  next();
+}
+
+function exigirAdmin(req, res, next) {
+  if (!req.usuario) {
+    return res.status(401).json({ erro: 'Faça login para continuar.' });
+  }
+  if (req.usuario.papel !== 'admin') {
+    return res.status(403).json({ erro: 'Só a secretaria (admin) pode fazer esta ação.' });
+  }
+  next();
+}
+
+app.use('/api', anexarUsuario);
+
+// -------------------------------------------------------------------
+// API — AUTENTICAÇÃO
+// -------------------------------------------------------------------
+
+app.post('/api/auth/registrar', async (req, res) => {
+  const cred = validarCredenciais(req.body);
+  if (cred.erros.length) return res.status(400).json({ erro: cred.erros.join(' ') });
+
+  const criado = await db.registrarUsuario(cred.login, cred.senha);
+  if (criado.erro) return res.status(409).json({ erro: criado.erro });
+  res.status(201).json(respostaSessao(criado));
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const cred = validarCredenciais(req.body);
+  if (cred.erros.length) return res.status(400).json({ erro: cred.erros.join(' ') });
+
+  const usuario = await db.autenticar(cred.login, cred.senha);
+  if (usuario.erro) return res.status(401).json({ erro: usuario.erro });
+  res.json(respostaSessao(usuario));
+});
+
+app.get('/api/auth/me', exigirLogin, (req, res) => {
+  res.json({ usuario: auth.usuarioPublico(req.usuario) });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  // Token é stateless; o cliente só precisa descartá-lo.
+  res.json({ ok: true });
+});
+
 // -------------------------------------------------------------------
 // API — ENDPOINTS DO CRUD
 // -------------------------------------------------------------------
@@ -120,8 +199,8 @@ app.get('/api/objetos/:id', async (req, res) => {
   res.json(objeto);
 });
 
-// POST /api/objetos → cadastra um objeto encontrado, sempre disponível e sem dono
-app.post('/api/objetos', async (req, res) => {
+// POST /api/objetos → cadastra (qualquer usuário logado)
+app.post('/api/objetos', exigirLogin, async (req, res) => {
   const novo = {
     nome: texto(req.body.nome),
     categoria: req.body.categoria,
@@ -131,18 +210,14 @@ app.post('/api/objetos', async (req, res) => {
     foto: req.body.foto || null
   };
 
-  const acesso = validarAcesso(req.body);
-  const erros = validar(novo).concat(acesso.erros);
+  const erros = validar(novo);
   if (erros.length) return res.status(400).json({ erro: erros.join(' ') });
-
-  const entrada = await db.entrar(acesso.login, acesso.senha);
-  if (entrada.erro) return res.status(401).json({ erro: entrada.erro });
 
   res.status(201).json(await db.criarObjeto(novo));
 });
 
-// PUT /api/objetos/:id → corrige os dados do objeto, sem mexer no dono nem na situação
-app.put('/api/objetos/:id', async (req, res) => {
+// PUT /api/objetos/:id → só admin
+app.put('/api/objetos/:id', exigirAdmin, async (req, res) => {
   const id = idDaRota(req, res);
   if (id == null) return;
   const atual = await buscarPorId(id);
@@ -175,8 +250,8 @@ app.put('/api/objetos/:id', async (req, res) => {
   res.json(salvo);
 });
 
-// POST /api/objetos/:id/reivindicar → outra pessoa se identifica como dono e marca a retirada
-app.post('/api/objetos/:id/reivindicar', async (req, res) => {
+// POST /api/objetos/:id/reivindicar → usuário logado (qualquer papel)
+app.post('/api/objetos/:id/reivindicar', exigirLogin, async (req, res) => {
   const id = idDaRota(req, res);
   if (id == null) return;
   const atual = await buscarPorId(id);
@@ -196,8 +271,8 @@ app.post('/api/objetos/:id/reivindicar', async (req, res) => {
   res.json(salvo);
 });
 
-// POST /api/objetos/:id/cancelar → desfaz a reserva e o objeto volta a ficar sem dono
-app.post('/api/objetos/:id/cancelar', async (req, res) => {
+// POST /api/objetos/:id/cancelar → só admin
+app.post('/api/objetos/:id/cancelar', exigirAdmin, async (req, res) => {
   const id = idDaRota(req, res);
   if (id == null) return;
   const atual = await buscarPorId(id);
@@ -211,8 +286,8 @@ app.post('/api/objetos/:id/cancelar', async (req, res) => {
   res.json(salvo);
 });
 
-// POST /api/objetos/:id/retirar → a secretaria confirma que o dono já levou o objeto
-app.post('/api/objetos/:id/retirar', async (req, res) => {
+// POST /api/objetos/:id/retirar → só admin
+app.post('/api/objetos/:id/retirar', exigirAdmin, async (req, res) => {
   const id = idDaRota(req, res);
   if (id == null) return;
   const atual = await buscarPorId(id);
@@ -229,8 +304,8 @@ app.post('/api/objetos/:id/retirar', async (req, res) => {
   res.json(salvo);
 });
 
-// DELETE /api/objetos/:id → exclui um objeto (exclusão)
-app.delete('/api/objetos/:id', async (req, res) => {
+// DELETE /api/objetos/:id → só admin
+app.delete('/api/objetos/:id', exigirAdmin, async (req, res) => {
   const id = idDaRota(req, res);
   if (id == null) return;
   const excluiu = await db.excluirObjeto(id);

@@ -5,6 +5,8 @@
 // ===================================================================
 (function () {
   const API = '/api/objetos';
+  const AUTH_API = '/api/auth';
+  const TOKEN_KEY = 'achados_token';
 
   // -----------------------------------------------------------------
   // DESENHOS (ícones das categorias e desenhos dos objetos de exemplo)
@@ -150,6 +152,9 @@
 
   // Dados que vieram do backend
   let objetos = [];
+  let sessao = null; // { login, papel } ou null
+  let authModo = 'login'; // login | registrar
+  let authDepois = null; // callback após login bem-sucedido
 
   let editingId = null;
   let editingObj = null;
@@ -163,16 +168,32 @@
   const fmtDate = (d) => { if (!d) return ''; const [y, m, dd] = d.split('-'); return dd + '/' + m + '/' + y; };
   const today = () => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); };
   const pad4 = (n) => String(n).padStart(4, '0');
+  const ehAdmin = () => !!(sessao && sessao.papel === 'admin');
+  const estaLogado = () => !!sessao;
+
+  function lerToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
+  }
+  function salvarToken(token) {
+    try {
+      if (token) localStorage.setItem(TOKEN_KEY, token);
+      else localStorage.removeItem(TOKEN_KEY);
+    } catch (e) { /* storage indisponível */ }
+  }
 
   // -----------------------------------------------------------------
   // COMUNICAÇÃO COM A API
   // -----------------------------------------------------------------
-  async function api(metodo, caminho, corpo) {
+  async function pedido(url, metodo, corpo) {
     let resposta;
+    const headers = {};
+    const token = lerToken();
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (corpo) headers['Content-Type'] = 'application/json';
     try {
-      resposta = await fetch(API + caminho, {
+      resposta = await fetch(url, {
         method: metodo,
-        headers: corpo ? { 'Content-Type': 'application/json' } : undefined,
+        headers,
         body: corpo ? JSON.stringify(corpo) : undefined
       });
     } catch (e) {
@@ -181,13 +202,148 @@
     }
     $('#offline').hidden = true;
     const dados = resposta.status === 204 ? null : await resposta.json().catch(() => null);
-    if (!resposta.ok) throw new Error((dados && dados.erro) || 'Erro ' + resposta.status);
+    if (!resposta.ok) {
+      if (resposta.status === 401 && token) {
+        salvarToken('');
+        sessao = null;
+        atualizarAuthBar();
+      }
+      throw new Error((dados && dados.erro) || 'Erro ' + resposta.status);
+    }
     return dados;
+  }
+
+  async function api(metodo, caminho, corpo) {
+    return pedido(API + caminho, metodo, corpo);
+  }
+
+  async function authApi(metodo, caminho, corpo) {
+    return pedido(AUTH_API + caminho, metodo, corpo);
   }
 
   async function carregarObjetos() {
     objetos = await api('GET', '');
   }
+
+  async function restaurarSessao() {
+    const token = lerToken();
+    if (!token) {
+      sessao = null;
+      atualizarAuthBar();
+      return;
+    }
+    try {
+      const dados = await authApi('GET', '/me');
+      sessao = dados.usuario;
+    } catch (e) {
+      salvarToken('');
+      sessao = null;
+    }
+    atualizarAuthBar();
+  }
+
+  function atualizarAuthBar() {
+    const bar = $('#authBar');
+    const navSec = $('#navSecretaria');
+    if (navSec) navSec.hidden = !ehAdmin();
+    if (!bar) return;
+    if (!sessao) {
+      bar.innerHTML = '<button type="button" class="btn soft small" id="btnEntrar">Entrar</button>';
+      return;
+    }
+    const papel = sessao.papel === 'admin' ? 'admin' : 'usuário';
+    bar.innerHTML =
+      '<span class="auth-user" title="' + esc(papel) + '">' + esc(sessao.login) + '</span>' +
+      '<button type="button" class="btn ghost small" id="btnSair">Sair</button>';
+  }
+
+  function abrirAuth(depois) {
+    authDepois = typeof depois === 'function' ? depois : null;
+    authModo = 'login';
+    pintarAuthModal();
+    $('#authOverlay').hidden = false;
+    $('#aLogin').focus();
+  }
+  function fecharAuth() {
+    $('#authOverlay').hidden = true;
+    authDepois = null;
+  }
+  function pintarAuthModal() {
+    const registrar = authModo === 'registrar';
+    $('#authTitle').textContent = registrar ? 'Criar conta' : 'Entrar';
+    $('#authSub').textContent = registrar
+      ? 'Crie um login para reivindicar objetos ou cadastrar achados. Contas novas são de usuário comum.'
+      : 'Use seu login para reivindicar um objeto ou cadastrar um achado.';
+    $('#authSubmit').textContent = registrar ? 'Criar conta' : 'Entrar';
+    $('#authToggle').textContent = registrar ? 'Já tenho conta' : 'Criar conta';
+    $('#eALogin').hidden = true;
+    $('#eASenha').hidden = true;
+    $('#eAuth').hidden = true;
+    $('#aLogin').classList.remove('bad');
+    $('#aSenha').classList.remove('bad');
+  }
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#btnEntrar') || e.target.closest('#btnEntrarCadastro')) {
+      e.preventDefault();
+      abrirAuth();
+    }
+    if (e.target.closest('#btnSair')) {
+      e.preventDefault();
+      salvarToken('');
+      sessao = null;
+      atualizarAuthBar();
+      toast('Você saiu da conta.');
+      const v = location.hash.slice(1) || 'inicio';
+      if (v === 'gerenciar') go('inicio');
+      else route();
+    }
+  });
+  $('#authClose').addEventListener('click', fecharAuth);
+  $('#authOverlay').addEventListener('click', (e) => { if (e.target.id === 'authOverlay') fecharAuth(); });
+  $('#authToggle').addEventListener('click', () => {
+    authModo = authModo === 'login' ? 'registrar' : 'login';
+    pintarAuthModal();
+  });
+  $('#authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const login = $('#aLogin').value.trim();
+    const senha = $('#aSenha').value.trim();
+    let ruim = false;
+    $('#eALogin').hidden = true;
+    $('#eASenha').hidden = true;
+    $('#eAuth').hidden = true;
+    $('#aLogin').classList.remove('bad');
+    $('#aSenha').classList.remove('bad');
+    if (login.length < 3 || /\s/.test(login)) {
+      $('#eALogin').hidden = false; $('#aLogin').classList.add('bad'); ruim = true;
+    }
+    if (senha.length < 4) {
+      $('#eASenha').hidden = false; $('#aSenha').classList.add('bad'); ruim = true;
+    }
+    if (ruim) return;
+    const btn = $('#authSubmit');
+    btn.disabled = true;
+    const eraRegistro = authModo === 'registrar';
+    try {
+      const caminho = eraRegistro ? '/registrar' : '/login';
+      const dados = await authApi('POST', caminho, { login, senha });
+      salvarToken(dados.token);
+      sessao = dados.usuario;
+      atualizarAuthBar();
+      fecharAuth();
+      toast(eraRegistro ? 'Conta criada. Bem-vindo, ' + sessao.login + '!' : 'Olá, ' + sessao.login + '!');
+      const depois = authDepois;
+      authDepois = null;
+      if (depois) depois();
+      else route();
+    } catch (err) {
+      $('#eAuth').textContent = err.message;
+      $('#eAuth').hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // -----------------------------------------------------------------
   // PEDAÇOS DE TELA
@@ -314,7 +470,7 @@
     renderPhotoPrev();
   }
   function clearErrors() {
-    ['Nome', 'Data', 'Local', 'Login', 'Senha'].forEach((k) => { $('#e' + k).hidden = true; $('#i' + k).classList.remove('bad'); });
+    ['Nome', 'Data', 'Local'].forEach((k) => { $('#e' + k).hidden = true; $('#i' + k).classList.remove('bad'); });
     $('#eData').textContent = 'Escolha a data.';
   }
   function fillForm() {
@@ -329,16 +485,25 @@
       $('#iLocal').value = o.local_encontrado; $('#iDesc').value = o.descricao || '';
       formFoto = o.foto || null;
       $('#submitBtn').textContent = 'Salvar alterações';
+      $('#submitBtn').disabled = !ehAdmin();
       $('#cancelEdit').hidden = false;
     } else {
       $('#formTitle').textContent = 'Cadastrar objeto encontrado';
-      $('#acesso').hidden = false;
-      $('#formSub').textContent = 'Encontrou alguma coisa? Entre com seu login e sua senha para cadastrar o objeto.';
+      if (!estaLogado()) {
+        $('#acesso').hidden = false;
+        $('#acessoHint').textContent = 'Entre com sua conta para cadastrar um objeto encontrado.';
+      } else {
+        $('#acesso').hidden = true;
+      }
+      $('#formSub').textContent = estaLogado()
+        ? 'Encontrou alguma coisa? Preencha os dados para o dono conseguir achar.'
+        : 'Encontrou alguma coisa? Entre na sua conta para cadastrar o objeto.';
       $('#objForm').reset();
       $('#iCat').value = 'mochila';
       $('#iData').value = today();
       formFoto = null;
       $('#submitBtn').textContent = 'Cadastrar objeto';
+      $('#submitBtn').disabled = !estaLogado();
       $('#cancelEdit').hidden = true;
     }
     $('#iFoto').value = '';
@@ -391,15 +556,13 @@
       $('#iData').classList.add('bad');
       firstBad = firstBad || $('#iData');
     }
-    if (editingId == null) {
-      d.login = $('#iLogin').value.trim();
-      d.senha = $('#iSenha').value.trim();
-      if (d.login.length < 3 || /\s/.test(d.login)) {
-        $('#eLogin').hidden = false; $('#iLogin').classList.add('bad'); firstBad = firstBad || $('#iLogin');
-      }
-      if (d.senha.length < 4) {
-        $('#eSenha').hidden = false; $('#iSenha').classList.add('bad'); firstBad = firstBad || $('#iSenha');
-      }
+    if (editingId != null && !ehAdmin()) {
+      toast('Só a secretaria pode editar objetos.');
+      return;
+    }
+    if (editingId == null && !estaLogado()) {
+      abrirAuth(() => { $('#objForm').requestSubmit(); });
+      return;
     }
     if (firstBad) { firstBad.focus(); return; }
 
@@ -420,6 +583,7 @@
       toast(err.message);
     } finally {
       btn.disabled = false;
+      if (editingId == null) fillForm();
     }
   });
 
@@ -427,6 +591,13 @@
   // TELA: GERENCIAR (alteração de status e exclusão)
   // -----------------------------------------------------------------
   function renderManage() {
+    if (!ehAdmin()) {
+      $('#summary').innerHTML = '';
+      $('#manageList').innerHTML =
+        '<div class="empty" style="margin:16px"><b>Acesso só para a secretaria</b>Entre com uma conta admin para gerenciar objetos.' +
+        ' <button type="button" class="linkbtn" id="btnEntrar">Entrar</button></div>';
+      return;
+    }
     const c = counts();
     $('#summary').innerHTML =
       '<div><b>' + c.total + '</b><span>cadastrados</span></div>' +
@@ -490,6 +661,7 @@
     }
     if (t.dataset.detail) openDetail(+t.dataset.detail);
     else if (t.dataset.edit) {
+      if (!ehAdmin()) { toast('Só a secretaria pode editar objetos.'); return; }
       const o = objetos.find((x) => x.id === +t.dataset.edit);
       if (o && o.status === 'devolvido') { toast('Objeto já devolvido não pode ser alterado.'); return; }
       editingId = +t.dataset.edit;
@@ -497,7 +669,10 @@
       retirarId = null;
       go('cadastrar');
     }
-    else if (t.dataset.del) { confirmarId(+t.dataset.del); }
+    else if (t.dataset.del) {
+      if (!ehAdmin()) { toast('Só a secretaria pode excluir objetos.'); return; }
+      confirmarId(+t.dataset.del);
+    }
     else if (t.hasAttribute('data-del-no')) { const id = confirmingId; confirmingId = null; renderManage(); const b = document.querySelector('[data-del="' + id + '"]'); if (b) b.focus(); }
     else if (t.dataset.delYes) {
       const id = +t.dataset.delYes;
@@ -565,16 +740,24 @@
   let lastFocus = null;
   function blocoDono(o) {
     if (o.status === 'disponivel') {
+      if (!estaLogado()) {
+        return '<div class="claim">' +
+          '<p class="retirada">É seu? Entre na sua conta para reivindicar e marcar a retirada na secretaria.</p>' +
+          '<button type="button" class="btn primary" id="btnEntrarClaim">Entrar para reivindicar</button>' +
+        '</div>';
+      }
       return '<form class="claim" id="claimForm">' +
         '<p class="retirada">É seu? Diga seu nome e um contato. O objeto fica reservado para você retirar na secretaria.</p>' +
-        '<div class="field"><label for="cNome">Seu nome <span class="req">*</span></label><input class="input" id="cNome" maxlength="60" autocomplete="name"><span class="err" id="eDono" hidden>Escreva seu nome.</span></div>' +
+        '<div class="field"><label for="cNome">Seu nome <span class="req">*</span></label><input class="input" id="cNome" maxlength="60" autocomplete="name" value="' + esc(sessao.login) + '"><span class="err" id="eDono" hidden>Escreva seu nome.</span></div>' +
         '<div class="field"><label for="cContato">Contato ou turma <span class="req">*</span></label><input class="input" id="cContato" maxlength="80" placeholder="Ex.: 8º ano B"><span class="err" id="eContato" hidden>Diga um contato para a secretaria.</span></div>' +
         '<button type="submit" class="btn primary" id="claimBtn">Sou o dono e quero retirar</button>' +
       '</form>';
     }
     if (o.status === 'aguardando') {
-      return '<p class="retirada">Reservado para <b>' + esc(o.dono_nome) + '</b>. A retirada é na secretaria.</p>' +
-        '<button type="button" class="btn ghost small" data-cancelar="' + o.id + '">Desfazer esta reserva</button>';
+      const desfazer = ehAdmin()
+        ? '<button type="button" class="btn ghost small" data-cancelar="' + o.id + '">Desfazer esta reserva</button>'
+        : '';
+      return '<p class="retirada">Reservado para <b>' + esc(o.dono_nome) + '</b>. A retirada é na secretaria.</p>' + desfazer;
     }
     return '<p class="retirada">Este objeto foi devolvido para <b>' + esc(o.dono_nome) + '</b>.</p>';
   }
@@ -600,9 +783,15 @@
     $('#overlay').hidden = false;
     $('#mClose').addEventListener('click', closeDetail);
     const form = $('#claimForm');
+    const btnClaim = $('#btnEntrarClaim');
     if (form) {
       form.addEventListener('submit', (e) => enviarReserva(e, o.id));
       $('#cNome').focus();
+    } else if (btnClaim) {
+      btnClaim.addEventListener('click', () => {
+        abrirAuth(() => openDetail(o.id));
+      });
+      btnClaim.focus();
     } else {
       $('#mClose').focus();
     }
@@ -636,7 +825,11 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
   $('#overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') closeDetail(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#overlay').hidden) closeDetail(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('#authOverlay').hidden) fecharAuth();
+    else if (!$('#overlay').hidden) closeDetail();
+  });
 
   // -----------------------------------------------------------------
   // AVISO RÁPIDO (toast)
@@ -660,6 +853,11 @@
   async function route() {
     let v = location.hash.slice(1);
     if (!VIEWS.includes(v)) v = 'inicio';
+    if (v === 'gerenciar' && !ehAdmin()) {
+      toast('A Secretaria é só para contas admin.');
+      if ((location.hash.slice(1) || 'inicio') !== 'inicio') location.hash = 'inicio';
+      return;
+    }
     if (v !== 'cadastrar') { editingId = null; editingObj = null; }
     if (v !== 'gerenciar') { confirmingId = null; retirarId = null; }
     document.querySelectorAll('[data-view]').forEach((s) => { s.hidden = s.dataset.view !== v; });
@@ -672,6 +870,12 @@
     if (v === 'cadastrar') {
       editingObj = null;
       if (editingId != null) {
+        if (!ehAdmin()) {
+          toast('Só a secretaria pode editar objetos.');
+          editingId = null;
+          go('inicio');
+          return;
+        }
         try { editingObj = await api('GET', '/' + editingId); }
         catch (err) { toast(err.message); editingId = null; }
         if (editingObj && editingObj.status === 'devolvido') {
@@ -698,5 +902,5 @@
     if (v === 'gerenciar') renderManage();
   }
   window.addEventListener('hashchange', route);
-  route();
+  restaurarSessao().then(route);
 })();
