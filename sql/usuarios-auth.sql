@@ -1,5 +1,7 @@
--- Migração: papéis e senhas com hash na tabela usuarios.
--- Rode no SQL Editor do Supabase (projeto achados-perdidos).
+-- Migração incremental: papéis na tabela usuarios (projetos que já tinham usuarios).
+-- Projeto Supabase: uzvoxpooxbwbokxtfcpi
+-- URL: https://uzvoxpooxbwbokxtfcpi.supabase.co
+-- Preferência em projeto novo: rode sql/schema.sql (cria objetos + usuarios + auth).
 -- Senhas antigas em texto claro continuam válidas: no próximo login
 -- o backend troca automaticamente pelo hash bcrypt.
 

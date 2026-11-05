@@ -1,7 +1,8 @@
 // ===================================================================
 // BANCO DE DADOS
 // Os objetos ficam na tabela "objetos" do projeto Supabase
-// achados-perdidos. O frontend continua falando só com esta API.
+// uzvoxpooxbwbokxtfcpi (https://uzvoxpooxbwbokxtfcpi.supabase.co).
+// O frontend continua falando só com esta API.
 //
 // Situação de cada objeto:
 //   disponivel → sem dono
