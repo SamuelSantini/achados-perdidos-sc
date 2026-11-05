@@ -826,14 +826,14 @@
     if (o.status === 'disponivel') {
       if (!estaLogado()) {
         return '<div class="claim">' +
-          '<p class="retirada">É seu? Entre na sua conta para reivindicar e marcar a retirada na secretaria.</p>' +
+          '<p class="retirada">É seu? Entre na sua conta para reivindicar e marcar a retirada na biblioteca.</p>' +
           '<button type="button" class="btn primary" id="btnEntrarClaim">Entrar para reivindicar</button>' +
         '</div>';
       }
       return '<form class="claim" id="claimForm">' +
-        '<p class="retirada">É seu? Diga seu nome e um contato. O objeto fica reservado para você retirar na secretaria.</p>' +
+        '<p class="retirada">É seu? Diga seu nome e um contato. O objeto fica reservado para você retirar na biblioteca.</p>' +
         '<div class="field"><label for="cNome">Seu nome <span class="req">*</span></label><input class="input" id="cNome" maxlength="60" autocomplete="name" value="' + esc(sessao.login) + '"><span class="err" id="eDono" hidden>Escreva seu nome.</span></div>' +
-        '<div class="field"><label for="cContato">Contato ou turma <span class="req">*</span></label><input class="input" id="cContato" maxlength="80" placeholder="Ex.: 8º ano B"><span class="err" id="eContato" hidden>Diga um contato para a secretaria.</span></div>' +
+        '<div class="field"><label for="cContato">Contato ou turma <span class="req">*</span></label><input class="input" id="cContato" maxlength="80" placeholder="Ex.: 8º ano B"><span class="err" id="eContato" hidden>Diga um contato para a retirada na biblioteca.</span></div>' +
         '<button type="submit" class="btn primary" id="claimBtn">Sou o dono e quero retirar</button>' +
       '</form>';
     }
@@ -841,7 +841,7 @@
       const desfazer = ehAdmin()
         ? '<button type="button" class="btn ghost small" data-cancelar="' + o.id + '">Desfazer esta reserva</button>'
         : '';
-      return '<p class="retirada">Reservado para <b>' + esc(o.dono_nome) + '</b>. A retirada é na secretaria.</p>' + desfazer;
+      return '<p class="retirada">Reservado para <b>' + esc(o.dono_nome) + '</b>. A retirada é na biblioteca.</p>' + desfazer;
     }
     return '<p class="retirada">Este objeto foi devolvido para <b>' + esc(o.dono_nome) + '</b>.</p>';
   }
@@ -897,7 +897,7 @@
     btn.disabled = true;
     try {
       await api('POST', '/' + id + '/reivindicar', { dono_nome: nome, dono_contato: contato });
-      await recarregar('“' + (alvo ? alvo.nome : 'Objeto') + '” ficou reservado para ' + nome + '. A retirada é na secretaria.');
+      await recarregar('“' + (alvo ? alvo.nome : 'Objeto') + '” ficou reservado para ' + nome + '. A retirada é na biblioteca.');
       openDetail(id);
     } catch (err) {
       toast(err.message);

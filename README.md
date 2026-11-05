@@ -117,7 +117,7 @@ Regras: nome, local e data são obrigatórios; a data é real e não pode ser no
 | data_encontrada | data | Data em que foi encontrado |
 | status | TEXT | disponivel (sem dono), aguardando (reserva) ou devolvido (entrega confirmada) |
 | dono_nome | TEXT | Nome de quem reservou a retirada. Vazio enquanto está disponível |
-| dono_contato | TEXT | Turma ou contato do dono, para a secretaria entregar |
+| dono_contato | TEXT | Turma ou contato do dono, para a entrega na biblioteca |
 | foto | TEXT | Foto enviada no cadastro (opcional) |
 | desenho | TEXT | Desenho usado nos objetos de exemplo |
 | criado_em | data e hora | Data e hora do cadastro |
@@ -125,8 +125,8 @@ Regras: nome, local e data são obrigatórios; a data é real e não pode ser no
 ## Fluxo
 
 1. Quem encontrou cadastra o objeto. Ele fica **disponível** e sem dono.
-2. Quem perdeu abre os detalhes, informa nome e contato e marca a retirada. O objeto fica **aguardando**.
-3. Na secretaria, a entrega é confirmada. O objeto fica **devolvido** e o cadastro não muda mais.
+2. Quem perdeu abre os detalhes, informa nome e contato e marca a retirada. O objeto fica **aguardando**. A retirada física é sempre na **biblioteca**.
+3. A tela Secretaria (admin) confirma a entrega. O objeto fica **devolvido** e o cadastro não muda mais.
 4. Uma reserva errada pode ser desfeita, e o objeto volta a ficar disponível.
 
 ## Colocar online
