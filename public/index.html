@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1e1621">
+  <meta name="color-scheme" content="light dark">
   <title>Achados e Perdidos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,14 +39,19 @@
       </svg>
       <b>Achados e Perdidos</b>
     </a>
-    <nav class="nav" aria-label="Páginas">
+    <nav class="nav" id="siteNav" aria-label="Páginas">
       <a href="#inicio" data-reset>Início</a>
       <a href="#achados" data-reset>Objetos encontrados</a>
       <a href="#cadastrar" data-reset>Cadastrar</a>
       <a href="#gerenciar" data-reset id="navSecretaria" hidden>Secretaria</a>
     </nav>
-    <div class="auth-bar" id="authBar">
-      <button type="button" class="btn soft small" id="btnEntrar">Entrar</button>
+    <div class="top-tools">
+      <div class="auth-bar" id="authBar">
+        <button type="button" class="btn soft small" id="btnEntrar">Entrar</button>
+      </div>
+      <button type="button" class="nav-toggle" id="navToggle" aria-controls="siteNav" aria-expanded="false" aria-label="Abrir menu">
+        <span class="nav-toggle-bars" aria-hidden="true"></span>
+      </button>
     </div>
   </div>
 </header>
@@ -169,8 +176,9 @@
           <div class="photo-drop">
             <div class="photo-prev t-pink" id="photoPrev"></div>
             <div class="photo-actions">
-              <label class="btn soft small" for="iFoto">Escolher foto</label>
-              <input id="iFoto" type="file" accept="image/*">
+              <button type="button" class="btn soft small" id="btnFoto">Escolher foto</button>
+              <input id="iFotoCamera" type="file" accept="image/*" capture="environment" hidden>
+              <input id="iFotoGaleria" type="file" accept="image/*" hidden>
               <button type="button" class="linkbtn" id="rmFoto" hidden>Remover foto</button>
               <span class="hint" style="flex-basis:100%">Sem foto, o site usa um desenho do objeto.</span>
             </div>
@@ -230,6 +238,20 @@
           <button type="button" class="btn ghost" id="authToggle">Criar conta</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="photoOverlay" hidden>
+  <div class="modal photo-chooser" role="dialog" aria-modal="true" aria-labelledby="photoTitle" id="photoModal">
+    <div class="modal-body photo-chooser-body">
+      <button type="button" class="icon-btn close" id="photoClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <h2 id="photoTitle">Adicionar foto</h2>
+      <p class="auth-sub">Tire uma foto agora ou escolha uma da galeria.</p>
+      <div class="photo-chooser-actions">
+        <button type="button" class="btn primary" id="fotoCamera">Tirar foto</button>
+        <button type="button" class="btn soft" id="fotoGaleria">Escolher da galeria</button>
+        <button type="button" class="btn ghost" id="fotoCancelar">Cancelar</button>
+      </div>
     </div>
   </div>
 </div>

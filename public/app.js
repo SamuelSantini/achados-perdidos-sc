@@ -171,6 +171,47 @@
   const ehAdmin = () => !!(sessao && sessao.papel === 'admin');
   const estaLogado = () => !!sessao;
 
+  // -----------------------------------------------------------------
+  // MENU MOBILE (hamburger)
+  // -----------------------------------------------------------------
+  function fecharNav() {
+    const top = document.querySelector('.top');
+    const btn = $('#navToggle');
+    if (!top || !btn) return;
+    top.classList.remove('is-nav-open');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-label', 'Abrir menu');
+  }
+  function abrirNav() {
+    const top = document.querySelector('.top');
+    const btn = $('#navToggle');
+    if (!top || !btn) return;
+    top.classList.add('is-nav-open');
+    btn.setAttribute('aria-expanded', 'true');
+    btn.setAttribute('aria-label', 'Fechar menu');
+  }
+  function alternarNav() {
+    const top = document.querySelector('.top');
+    if (top && top.classList.contains('is-nav-open')) fecharNav();
+    else abrirNav();
+  }
+  const navToggle = $('#navToggle');
+  if (navToggle) {
+    navToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      alternarNav();
+    });
+  }
+  document.addEventListener('click', (e) => {
+    const top = document.querySelector('.top');
+    if (!top || !top.classList.contains('is-nav-open')) return;
+    if (e.target.closest('.top')) return;
+    fecharNav();
+  });
+  window.addEventListener('resize', () => {
+    if (window.matchMedia('(min-width: 821px)').matches) fecharNav();
+  });
+
   function lerToken() {
     try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
   }
@@ -506,7 +547,7 @@
       $('#submitBtn').disabled = !estaLogado();
       $('#cancelEdit').hidden = true;
     }
-    $('#iFoto').value = '';
+    limparInputsFoto();
     $('#iData').max = today();
     renderLivePreview();
   }
@@ -533,13 +574,56 @@
       r.readAsDataURL(file);
     });
   }
-  $('#iFoto').addEventListener('change', async (e) => {
+  function limparInputsFoto() {
+    const cam = $('#iFotoCamera');
+    const gal = $('#iFotoGaleria');
+    if (cam) cam.value = '';
+    if (gal) gal.value = '';
+  }
+  function precisaEscolherFonteFoto() {
+    return window.matchMedia('(max-width: 820px), (pointer: coarse)').matches;
+  }
+  function abrirSeletorFoto() {
+    $('#photoOverlay').hidden = false;
+  }
+  function fecharSeletorFoto() {
+    $('#photoOverlay').hidden = true;
+  }
+  function abrirFonteFoto(fonte) {
+    fecharSeletorFoto();
+    const input = fonte === 'camera' ? $('#iFotoCamera') : $('#iFotoGaleria');
+    if (!input) return;
+    input.value = '';
+    input.click();
+  }
+  async function aoEscolherFoto(e) {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
-    try { formFoto = await readPhoto(f); renderLivePreview(); }
-    catch (err) { toast('Não deu para abrir essa imagem. Tente uma foto em JPG ou PNG.'); }
+    try {
+      formFoto = await readPhoto(f);
+      renderLivePreview();
+    } catch (err) {
+      toast('Não deu para abrir essa imagem. Tente uma foto em JPG ou PNG.');
+    }
+  }
+  $('#btnFoto').addEventListener('click', () => {
+    if (precisaEscolherFonteFoto()) abrirSeletorFoto();
+    else abrirFonteFoto('galeria');
   });
-  $('#rmFoto').addEventListener('click', () => { formFoto = null; $('#iFoto').value = ''; renderLivePreview(); });
+  $('#fotoCamera').addEventListener('click', () => abrirFonteFoto('camera'));
+  $('#fotoGaleria').addEventListener('click', () => abrirFonteFoto('galeria'));
+  $('#fotoCancelar').addEventListener('click', fecharSeletorFoto);
+  $('#photoClose').addEventListener('click', fecharSeletorFoto);
+  $('#photoOverlay').addEventListener('click', (e) => {
+    if (e.target.id === 'photoOverlay') fecharSeletorFoto();
+  });
+  $('#iFotoCamera').addEventListener('change', aoEscolherFoto);
+  $('#iFotoGaleria').addEventListener('change', aoEscolherFoto);
+  $('#rmFoto').addEventListener('click', () => {
+    formFoto = null;
+    limparInputsFoto();
+    renderLivePreview();
+  });
   $('#cancelEdit').addEventListener('click', () => { editingId = null; go('gerenciar'); });
 
   $('#objForm').addEventListener('submit', async (e) => {
@@ -828,7 +912,9 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!$('#authOverlay').hidden) fecharAuth();
+    else if ($('#photoOverlay') && !$('#photoOverlay').hidden) fecharSeletorFoto();
     else if (!$('#overlay').hidden) closeDetail();
+    else fecharNav();
   });
 
   // -----------------------------------------------------------------
@@ -853,6 +939,7 @@
   async function route() {
     let v = location.hash.slice(1);
     if (!VIEWS.includes(v)) v = 'inicio';
+    fecharNav();
     if (v === 'gerenciar' && !ehAdmin()) {
       toast('A Secretaria é só para contas admin.');
       if ((location.hash.slice(1) || 'inicio') !== 'inicio') location.hash = 'inicio';

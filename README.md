@@ -141,3 +141,10 @@ O site e a API sobem juntos no **Render**, ligados ao repositório do GitHub. O 
 Build: `npm install`. Start: `npm start`. A região é a Virgínia.
 
 No plano grátis o serviço dorme sem visitas. A primeira abertura depois disso pode levar cerca de um minuto. Os objetos não se perdem, porque ficam no Supabase.
+
+### Se a home mostrar “Não deu para carregar os objetos”
+
+1. **Supabase:** no [SQL Editor](https://supabase.com/dashboard/project/uzvoxpooxbwbokxtfcpi/sql), rode `sql/schema.sql` (sem isso a tabela `objetos` não existe e a API responde erro).
+2. **Render → Environment:** `SUPABASE_URL=https://uzvoxpooxbwbokxtfcpi.supabase.co`, `SUPABASE_PUBLISHABLE_KEY` = chave publishable/anon do dashboard (não a service_role), `SESSION_SECRET` ≥ 16 caracteres (`openssl rand -hex 32`).
+3. **Redeploy** no Render depois de salvar as variáveis.
+4. Abra de novo `/api/objetos`: lista JSON = ok; mensagem sobre schema/chave = siga o texto da API.
