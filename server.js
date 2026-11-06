@@ -125,7 +125,10 @@ async function anexarUsuario(req, res, next) {
     const u = await db.buscarUsuario(sessao.login);
     req.usuario = u ? { login: u.login, papel: u.papel } : null;
   } catch (err) {
-    return next(err);
+    // Auth opcional: falha no Supabase não pode derrubar GET público /api/objetos.
+    // Rotas protegidas ainda bloqueiam via exigirLogin (req.usuario fica null).
+    console.error('Sessão ignorada (falha ao buscar usuário):', err);
+    req.usuario = null;
   }
   next();
 }
@@ -318,12 +321,18 @@ app.use('/api', (req, res) => {
   res.status(404).json({ erro: 'Endereço da API não encontrado.' });
 });
 
-// Se der algum erro inesperado (ex.: JSON quebrado ou foto grande demais)
+// Se der algum erro inesperado (ex.: JSON quebrado, foto grande ou Supabase)
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') return res.status(400).json({ erro: 'A foto é grande demais.' });
   if (err.type === 'entity.parse.failed') return res.status(400).json({ erro: 'Os dados enviados não são um JSON válido.' });
   console.error(err);
-  res.status(500).json({ erro: 'Erro no servidor.' });
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  // Mensagens operacionais do db.js (schema/chave/rede) vão para a UI; o resto fica genérico.
+  const msg =
+    status === 503 && typeof err.message === 'string' && err.message
+      ? err.message
+      : 'Erro no servidor.';
+  res.status(status).json({ erro: msg });
 });
 
 app.listen(PORTA, () => {

@@ -117,7 +117,7 @@ Regras: nome, local e data são obrigatórios; a data é real e não pode ser no
 | data_encontrada | data | Data em que foi encontrado |
 | status | TEXT | disponivel (sem dono), aguardando (reserva) ou devolvido (entrega confirmada) |
 | dono_nome | TEXT | Nome de quem reservou a retirada. Vazio enquanto está disponível |
-| dono_contato | TEXT | Turma ou contato do dono, para a secretaria entregar |
+| dono_contato | TEXT | Turma ou contato do dono, para a entrega na biblioteca |
 | foto | TEXT | Foto enviada no cadastro (opcional) |
 | desenho | TEXT | Desenho usado nos objetos de exemplo |
 | criado_em | data e hora | Data e hora do cadastro |
@@ -125,8 +125,8 @@ Regras: nome, local e data são obrigatórios; a data é real e não pode ser no
 ## Fluxo
 
 1. Quem encontrou cadastra o objeto. Ele fica **disponível** e sem dono.
-2. Quem perdeu abre os detalhes, informa nome e contato e marca a retirada. O objeto fica **aguardando**.
-3. Na secretaria, a entrega é confirmada. O objeto fica **devolvido** e o cadastro não muda mais.
+2. Quem perdeu abre os detalhes, informa nome e contato e marca a retirada. O objeto fica **aguardando**. A retirada física é sempre na **biblioteca**.
+3. A tela Secretaria (admin) confirma a entrega. O objeto fica **devolvido** e o cadastro não muda mais.
 4. Uma reserva errada pode ser desfeita, e o objeto volta a ficar disponível.
 
 ## Colocar online
@@ -141,3 +141,10 @@ O site e a API sobem juntos no **Render**, ligados ao repositório do GitHub. O 
 Build: `npm install`. Start: `npm start`. A região é a Virgínia.
 
 No plano grátis o serviço dorme sem visitas. A primeira abertura depois disso pode levar cerca de um minuto. Os objetos não se perdem, porque ficam no Supabase.
+
+### Se a home mostrar “Não deu para carregar os objetos”
+
+1. **Supabase:** no [SQL Editor](https://supabase.com/dashboard/project/uzvoxpooxbwbokxtfcpi/sql), rode `sql/schema.sql` (sem isso a tabela `objetos` não existe e a API responde erro).
+2. **Render → Environment:** `SUPABASE_URL=https://uzvoxpooxbwbokxtfcpi.supabase.co`, `SUPABASE_PUBLISHABLE_KEY` = chave publishable/anon do dashboard (não a service_role), `SESSION_SECRET` ≥ 16 caracteres (`openssl rand -hex 32`).
+3. **Redeploy** no Render depois de salvar as variáveis.
+4. Abra de novo `/api/objetos`: lista JSON = ok; mensagem sobre schema/chave = siga o texto da API.

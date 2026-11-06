@@ -24,10 +24,51 @@ if (!url || !key) {
 
 const supabase = createClient(url, key);
 
+function mensagemDoSupabase(error) {
+  const codigo = error && error.code;
+  const texto = String((error && error.message) || '');
+  const detalhes = String((error && error.details) || '');
+  const junto = (texto + ' ' + detalhes).toLowerCase();
+
+  // Tabela/view ausente (schema ainda não aplicado no projeto)
+  if (
+    codigo === 'PGRST205' ||
+    codigo === '42P01' ||
+    /could not find the table|relation .* does not exist|schema cache/i.test(junto)
+  ) {
+    return (
+      'Tabela ausente no Supabase. Rode sql/schema.sql no SQL Editor do projeto ' +
+      'uzvoxpooxbwbokxtfcpi e tente de novo.'
+    );
+  }
+
+  // Chave/URL inválida ou JWT rejeitado
+  if (
+    codigo === 'PGRST301' ||
+    /jwt|invalid api key|invalid authentication|failed to parse/i.test(junto)
+  ) {
+    return (
+      'Supabase rejeitou a chave ou a URL. Confira SUPABASE_URL e ' +
+      'SUPABASE_PUBLISHABLE_KEY no Render (Project Settings → API Keys).'
+    );
+  }
+
+  // Projeto pausado / rede / DNS
+  if (/fetch failed|enotfound|econnrefused|etimedout|network/i.test(junto)) {
+    return (
+      'Não foi possível alcançar o Supabase. Confira SUPABASE_URL ' +
+      '(https://uzvoxpooxbwbokxtfcpi.supabase.co) e se o projeto está ativo.'
+    );
+  }
+
+  return 'Não foi possível falar com o Supabase.';
+}
+
 function falha(error) {
   console.error(error);
-  const err = new Error('Não foi possível falar com o Supabase.');
+  const err = new Error(mensagemDoSupabase(error));
   err.cause = error;
+  err.status = 503;
   throw err;
 }
 
