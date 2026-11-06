@@ -305,13 +305,23 @@ button, .btn, .icon-btn, .linkbtn, .nav a, .nav-toggle {
 .card:hover { transform: translateY(-3px); }
 .pic {
   aspect-ratio: 4 / 3;
+  width: 100%;
   max-width: 100%;
   display: grid; place-items: center;
   color: var(--ink);
   position: relative;
+  overflow: hidden;
 }
-.pic svg { width: 44%; height: auto; }
-.pic img { width: 100%; height: 100%; object-fit: cover; }
+.pic svg { width: 44%; height: auto; max-height: 70%; }
+.pic img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
 .t-pink { background: var(--pink); }
 .t-lilac { background: var(--lilac); }
 .t-mint { background: var(--mint); }
@@ -417,12 +427,14 @@ select.input {
   overflow: hidden;
   display: grid;
   place-items: center;
+  position: relative;
 }
 .photo-prev img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   display: block;
 }
@@ -463,20 +475,7 @@ select.input {
 }
 #livePreview .pic {
   aspect-ratio: 4 / 3;
-  max-height: 200px;
-}
-#livePreview .pic img {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  object-fit: contain;
-  object-position: center;
-  display: block;
-}
-#livePreview .pic svg {
-  width: min(44%, 96px);
-  height: auto;
-  max-height: 70%;
+  max-height: none;
 }
 
 /* ---------- gerenciar ---------- */
@@ -502,9 +501,16 @@ select.input {
 }
 .item { border-bottom: 1px solid var(--line); font-size: .93rem; }
 .item:last-child { border-bottom: 0; }
-.thumb { width: 56px; height: 56px; border-radius: 12px; overflow: hidden; display: grid; place-items: center; }
-.thumb img { width: 100%; height: 100%; object-fit: cover; }
-.thumb svg { width: 60%; }
+.thumb {
+  width: 56px; height: 56px; border-radius: 12px; overflow: hidden;
+  display: grid; place-items: center; position: relative; flex: none;
+}
+.thumb img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center; display: block;
+}
+.thumb svg { width: 60%; height: auto; max-height: 70%; }
 .item .name b { display: block; font-weight: 800; }
 .item .name span { font-size: .78rem; color: var(--muted); font-weight: 700; }
 .item .date { font-variant-numeric: tabular-nums; }
@@ -545,7 +551,20 @@ select.input {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
 }
 .modal.auth-modal { grid-template-columns: 1fr; }
-.modal .pic { aspect-ratio: auto; min-height: 240px; height: 100%; }
+.modal .pic {
+  aspect-ratio: auto;
+  min-height: 240px;
+  height: 100%;
+  align-self: stretch;
+}
+.modal .pic img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
 .modal-body { padding: 24px; display: grid; gap: 12px; align-content: start; position: relative; min-width: 0; }
 .modal-body h2 { font-size: 1.6rem; font-weight: 800; padding-right: 36px; }
 .modal-body .desc { color: var(--muted); }
@@ -688,7 +707,6 @@ select.input {
   #livePreview .card {
     max-width: min(100%, 280px);
   }
-  #livePreview .pic { max-height: 168px; }
   .form-actions { flex-direction: column; align-items: stretch; }
   .form-actions .btn { width: 100%; }
   .auth-actions { flex-direction: column; align-items: stretch; }
